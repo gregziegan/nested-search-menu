@@ -25,7 +25,7 @@ type alias SearchResult =
 
 init : Model
 init =
-    { items = toSearchTree items
+    { items = Tree.fromList treeConfig items
     , curDirectory = ""
     }
 
@@ -52,40 +52,33 @@ viewSearchResults curDirectory searchTree =
         |> ul [ class "menu" ]
 
 
-viewItem resultName =
-    li [ class "menu-item" ] [ text resultName ]
+viewItem itemPath =
+    case itemPath of
+        [] ->
+            text ""
+
+        [ name ] ->
+            li [ class "menu-item" ] [ text name ]
+
+        curDir :: rest ->
+            li [ class "menu-item menu-directory" ] [ text curDir ]
 
 
-items : List SearchJson
+items : List ( List String, SearchResult )
 items =
     [ { id = "3", path = "bash_profile" }
     , { id = "2", path = "dev/cool_project" }
     , { id = "1", path = "dev/cool_project/start.sh" }
     ]
+        |> List.map (\item -> ( toPath item, toSearchResult item ))
 
 
+name : SearchJson -> String
 name searchJson =
-    String.split "::" searchJson.path
+    String.split "/" searchJson.path
         |> List.reverse
         |> List.head
         |> Maybe.withDefault "NOPE!"
-
-
-toCurPath searchJson =
-    searchJson.path
-        |> String.split "/"
-        |> List.head
-        |> Maybe.withDefault "NOPE!"
-
-
-nextDirectory searchJson =
-    { searchJson
-        | path =
-            searchJson.path
-                |> String.split "/"
-                |> List.drop 1
-                |> String.join "/"
-    }
 
 
 toSearchResult : SearchJson -> SearchResult
@@ -97,25 +90,13 @@ toPath searchJson =
     if String.contains "/" searchJson.path then
         searchJson.path
             |> String.split "/"
-            |> List.head
-            |> Maybe.withDefault "NOPE"
     else
-        ""
+        []
 
 
-treeConfig : Tree.Config SearchJson SearchResult
+treeConfig : Tree.Config SearchResult
 treeConfig =
-    { toPath = toPath
-    , toCurPath = toCurPath
-    , toName = name
-    , nextDirectory = nextDirectory
-    , toFile = toSearchResult
-    }
-
-
-toSearchTree : List SearchJson -> Tree SearchResult
-toSearchTree items =
-    Tree.fromList treeConfig items
+    { toName = .name }
 
 
 main =
