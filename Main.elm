@@ -44,10 +44,89 @@ simpleTree =
         ]
 
 
+items : List ( List String, SearchResult )
+items =
+    [ { id = "3", path = ".bash_profile" }
+    , { id = "1", path = "dev/cool_project/start.sh" }
+    , { id = "2", path = "dev/README.md" }
+    ]
+        |> List.map (\item -> ( toPath item.path, toSearchResult item ))
+
+
+toPath str =
+    let
+        path =
+            String.split "/" str
+    in
+        List.take (List.length path - 1) path
+
+
+treeFromList : List ( List String, SearchResult ) -> Tree SearchResult
+treeFromList xs =
+    List.foldl insertIntoTree (Tree (Directory "/") []) xs
+
+
+insertIntoTree : ( List String, SearchResult ) -> Tree SearchResult -> Tree SearchResult
+insertIntoTree =
+    insertIntoTreeHelper
+
+
+inCurrentDirectory itemPath tree =
+    case Tree.datum tree of
+        Directory name ->
+            String.startsWith name itemPath
+
+        File _ ->
+            False
+
+
+isInChildDirectories itemPath children =
+    List.any (inCurrentDirectory itemPath) children
+
+
+isSameDirectory : String -> Tree SearchResult -> Bool
+isSameDirectory path tree =
+    case Tree.datum tree of
+        Directory name ->
+            path == name
+
+        File _ ->
+            False
+
+
+noChildrenHavePath path children =
+    List.all (not << isSameDirectory path) children
+
+
+insertIntoTreeHelper : ( List String, SearchResult ) -> Tree SearchResult -> Tree SearchResult
+insertIntoTreeHelper ( path, searchResult ) tree =
+    case path of
+        [] ->
+            case Tree.datum tree of
+                Directory name ->
+                    Tree.insertChild (Tree searchResult []) tree
+
+                File _ ->
+                    tree
+
+        curPath :: restOfPath ->
+            case Tree.datum tree of
+                Directory name ->
+                    if isInChildDirectories curPath (Tree.children tree) then
+                        Tree (Tree.datum tree) (List.map (insertIntoTreeHelper ( restOfPath, searchResult )) (Tree.children tree))
+                    else if noChildrenHavePath name (Tree.children tree) then
+                        insertIntoTreeHelper ( path, searchResult ) (Tree.insertChild (Tree (Directory curPath) []) tree)
+                    else
+                        tree
+
+                File _ ->
+                    tree
+
+
 init : Model
 init =
     { items =
-        Just ( simpleTree, [] )
+        Just ( treeFromList items, [] )
             &> goToRoot
     }
 
@@ -118,16 +197,6 @@ viewItem index tree =
         Directory name ->
             li [ class "menu-item menu-directory", onClick (MoveToDirectory index) ]
                 [ text name, text ">" ]
-
-
-items : List ( List String, SearchResult )
-items =
-    [ { id = "3", path = ".bash_profile" }
-    , { id = "1", path = "dev/cool_project/start.sh" }
-    , { id = "2", path = "dev/README.md" }
-    ]
-        |> List.map (\item -> ( String.split "/" item.path, toSearchResult item ))
-        |> Debug.log "items"
 
 
 name : SearchJson -> String
