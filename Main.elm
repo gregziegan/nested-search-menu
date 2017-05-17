@@ -4,7 +4,7 @@ import Html exposing (..)
 import Html.Attributes exposing (class, value)
 import Html.Events exposing (onClick, onInput, onWithOptions, keyCode)
 import Json.Decode as Json
-import MultiwayTree as Tree exposing (Tree(Tree))
+import MultiwayTree as Tree exposing (Forest, Tree(Tree))
 import MultiwayTreeZipper as Zipper exposing (Breadcrumbs, Context(Context), Zipper, goToChild, goToRoot, goUp)
 
 
@@ -31,6 +31,7 @@ type SearchResult
     | File FileInfo
 
 
+(&>) : Maybe a -> (a -> Maybe b) -> Maybe b
 (&>) =
     flip Maybe.andThen
 
@@ -44,6 +45,7 @@ items =
         |> List.map (\item -> ( toPath item.path, toSearchResult item ))
 
 
+toPath : String -> List String
 toPath str =
     let
         path =
@@ -62,6 +64,7 @@ insertIntoTree =
     insertIntoTreeHelper
 
 
+inCurrentDirectory : String -> Tree SearchResult -> Bool
 inCurrentDirectory itemPath tree =
     case Tree.datum tree of
         Directory name ->
@@ -71,6 +74,7 @@ inCurrentDirectory itemPath tree =
             False
 
 
+isInChildDirectories : String -> Forest SearchResult -> Bool
 isInChildDirectories itemPath children =
     List.any (inCurrentDirectory itemPath) children
 
@@ -85,6 +89,7 @@ isSameDirectory path tree =
             False
 
 
+noChildrenHavePath : String -> Forest SearchResult -> Bool
 noChildrenHavePath path children =
     List.all (not << isSameDirectory path) children
 
@@ -168,6 +173,7 @@ view model =
             text ""
 
 
+fromResult : Result String a -> Json.Decoder a
 fromResult result =
     case result of
         Ok val ->
@@ -216,6 +222,7 @@ viewContext (Context lastNode _ _) =
             text ""
 
 
+filterSearchResult : String -> SearchResult -> Bool
 filterSearchResult search searchResult =
     case searchResult of
         Directory name ->
@@ -236,6 +243,7 @@ toFilteredSearchResults search tree =
             |> Maybe.withDefault []
 
 
+viewSearchResults : String -> Tree SearchResult -> Html Msg
 viewSearchResults search searchTree =
     searchTree
         |> toFilteredSearchResults search
@@ -267,6 +275,7 @@ toSearchResult searchJson =
     File { id = searchJson.id, name = name searchJson }
 
 
+main : Program Never Model Msg
 main =
     Html.beginnerProgram
         { model = init
