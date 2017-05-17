@@ -56,7 +56,7 @@ toPath str =
 
 treeFromList : List ( List String, SearchResult ) -> Tree SearchResult
 treeFromList xs =
-    List.foldl insertIntoTree (Tree (Directory "/") []) xs
+    List.foldl insertIntoTree (Tree (Directory "All") []) xs
 
 
 insertIntoTree : ( List String, SearchResult ) -> Tree SearchResult -> Tree SearchResult
@@ -164,7 +164,10 @@ view model =
     case model.items of
         Just ( tree, breadcrumbs ) ->
             div []
-                [ viewBreadCrumbs breadcrumbs
+                [ if model.search == "" then
+                    viewBreadCrumbs breadcrumbs
+                  else
+                    text ""
                 , viewSearchResults model.search tree
                 , viewSearchInput model.search
                 ]
@@ -209,6 +212,8 @@ viewSearchInput search =
 viewBreadCrumbs : Breadcrumbs SearchResult -> Html Msg
 viewBreadCrumbs breadcrumbs =
     List.map viewContext breadcrumbs
+        |> List.reverse
+        |> List.intersperse (span [] [ text "/" ])
         |> div []
 
 
@@ -216,7 +221,7 @@ viewContext : Context SearchResult -> Html Msg
 viewContext (Context lastNode _ _) =
     case lastNode of
         Directory name ->
-            p [ onClick GoUp ] [ text name ]
+            span [ onClick GoUp ] [ text name ]
 
         _ ->
             text ""
