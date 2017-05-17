@@ -1,14 +1,15 @@
 module Main exposing (..)
 
 import Html exposing (..)
-import Html.Attributes exposing (class)
-import Html.Events exposing (onClick)
+import Html.Attributes exposing (class, value)
+import Html.Events exposing (onClick, onInput)
 import MultiwayTree as Tree exposing (Tree(Tree))
 import MultiwayTreeZipper as Zipper exposing (Breadcrumbs, Context(Context), Zipper, goToChild, goToRoot, goUp)
 
 
 type alias Model =
     { items : Maybe (Zipper SearchResult)
+    , search : String
     }
 
 
@@ -31,17 +32,6 @@ type SearchResult
 
 (&>) =
     flip Maybe.andThen
-
-
-simpleTree =
-    Tree (Directory "/")
-        [ Tree (Directory "dev")
-            [ Tree (Directory "cool_project")
-                [ Tree (File { id = "2", name = "start.sh" }) [] ]
-            , Tree (File { id = "3", name = "README.md" }) []
-            ]
-        , Tree (File { id = "1", name = ".bash_profile" }) []
-        ]
 
 
 items : List ( List String, SearchResult )
@@ -128,12 +118,14 @@ init =
     { items =
         Just ( treeFromList items, [] )
             &> goToRoot
+    , search = ""
     }
 
 
 type Msg
     = MoveToDirectory Int
     | GoUp
+    | Search String
 
 
 update : Msg -> Model -> Model
@@ -149,6 +141,9 @@ update msg model =
         GoUp ->
             { model | items = model.items &> goUp }
 
+        Search text ->
+            { model | search = text }
+
 
 view : Model -> Html Msg
 view model =
@@ -156,11 +151,17 @@ view model =
         Just ( tree, breadcrumbs ) ->
             div []
                 [ viewBreadCrumbs breadcrumbs
-                , viewSearchResults tree
+                , viewSearchResults model.search tree
+                , viewSearchInput model.search
                 ]
 
         Nothing ->
             text ""
+
+
+viewSearchInput : String -> Html Msg
+viewSearchInput search =
+    input [ value search, onInput Search ] []
 
 
 viewBreadCrumbs : Breadcrumbs SearchResult -> Html Msg
@@ -179,18 +180,36 @@ viewContext (Context lastNode _ _) =
             text ""
 
 
-viewSearchResults searchTree =
-    Tree.children searchTree
+filterSearchResult search searchResult =
+    case searchResult of
+        Directory name ->
+            String.startsWith search name
+
+        File { name } ->
+            String.startsWith search name
+
+
+toFilteredSearchResults : String -> Tree SearchResult -> List SearchResult
+toFilteredSearchResults search tree =
+    if search == "" then
+        Tree.children tree
+            |> List.map Tree.datum
+    else
+        Tree.filterWithChildPrecedence (filterSearchResult search) tree
+            |> Maybe.map Tree.flatten
+            |> Maybe.withDefault []
+
+
+viewSearchResults search searchTree =
+    searchTree
+        |> toFilteredSearchResults search
         |> List.indexedMap viewItem
         |> ul [ class "menu" ]
 
 
-
--- viewItem : Int -> Tree SearchResult -> Html Msg
-
-
-viewItem index tree =
-    case Tree.datum tree of
+viewItem : Int -> SearchResult -> Html Msg
+viewItem index searchResult =
+    case searchResult of
         File { name } ->
             li [ class "menu-item" ] [ text name ]
 
@@ -210,12 +229,6 @@ name searchJson =
 toSearchResult : SearchJson -> SearchResult
 toSearchResult searchJson =
     (File { id = searchJson.id, name = name searchJson })
-
-
-
--- treeConfig : FileTree.Config SearchResult
--- treeConfig =
--- { toName = .name }
 
 
 main =
