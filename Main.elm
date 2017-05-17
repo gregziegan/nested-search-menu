@@ -2,7 +2,8 @@ module Main exposing (..)
 
 import Html exposing (..)
 import Html.Attributes exposing (class, value)
-import Html.Events exposing (onClick, onInput)
+import Html.Events exposing (onClick, onInput, onWithOptions, keyCode)
+import Json.Decode as Json
 import MultiwayTree as Tree exposing (Tree(Tree))
 import MultiwayTreeZipper as Zipper exposing (Breadcrumbs, Context(Context), Zipper, goToChild, goToRoot, goUp)
 
@@ -126,6 +127,8 @@ type Msg
     = MoveToDirectory Int
     | GoUp
     | Search String
+    | Close
+    | NoOp
 
 
 update : Msg -> Model -> Model
@@ -144,6 +147,12 @@ update msg model =
         Search text ->
             { model | search = text }
 
+        Close ->
+            { model | search = "" }
+
+        NoOp ->
+            model
+
 
 view : Model -> Html Msg
 view model =
@@ -159,9 +168,36 @@ view model =
             text ""
 
 
+fromResult result =
+    case result of
+        Ok val ->
+            Json.succeed val
+
+        Err reason ->
+            Json.fail reason
+
+
 viewSearchInput : String -> Html Msg
 viewSearchInput search =
-    input [ value search, onInput Search ] []
+    let
+        options =
+            { preventDefault = True, stopPropagation = False }
+
+        dec =
+            (Json.map
+                (\code ->
+                    if code == 38 || code == 40 then
+                        Ok NoOp
+                    else if code == 27 then
+                        Ok Close
+                    else
+                        Err "not handling that key"
+                )
+                keyCode
+            )
+                |> Json.andThen fromResult
+    in
+        input [ value search, onInput Search, onWithOptions "keydown" options dec ] []
 
 
 viewBreadCrumbs : Breadcrumbs SearchResult -> Html Msg
@@ -228,7 +264,7 @@ name searchJson =
 
 toSearchResult : SearchJson -> SearchResult
 toSearchResult searchJson =
-    (File { id = searchJson.id, name = name searchJson })
+    File { id = searchJson.id, name = name searchJson }
 
 
 main =
