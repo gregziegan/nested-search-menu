@@ -153,7 +153,7 @@ update msg model =
             { model | search = text }
 
         Close ->
-            { model | search = "" }
+            { model | search = "", items = model.items &> goToRoot }
 
         NoOp ->
             model
